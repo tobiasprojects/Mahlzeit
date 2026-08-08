@@ -1,4 +1,4 @@
-# Implementation Plan — FoodDashboard
+# Implementation Plan — Mahlzeit
 
 Step-by-step plan to implement the project described in `PROJECT.md`. Work through
 the steps in order. Each step ends with a **Definition of Done (DoD)** — do not move
@@ -22,10 +22,10 @@ Create the package skeleton and ignore rules. No logic yet.
 Files to create:
 - `pyproject.toml` — project metadata, `[project.scripts]` optional; Python 3.14,
   zero runtime deps.
-- `src/menu_sync/__init__.py` — package marker + `__version__`.
-- `src/menu_sync/cli.py`, `model.py`, `store.py`, `registry.py` — empty stubs (imports
+- `src/mahlzeit/__init__.py` — package marker + `__version__`.
+- `src/mahlzeit/cli.py`, `model.py`, `store.py`, `registry.py` — empty stubs (imports
   only) so the package imports cleanly.
-- `src/menu_sync/sources/__init__.py`, `sources/base.py`, `sources/vaihingen.py`,
+- `src/mahlzeit/sources/__init__.py`, `sources/base.py`, `sources/vaihingen.py`,
   `sources/roland.py` — empty stubs.
 - `data/` + `data/raw/` directories.
 - `web/index.html`, `web/app.js`, `web/style.css` — minimal placeholders.
@@ -33,10 +33,10 @@ Files to create:
 - `testdata/` directory + README explaining fixture conventions.
 
 Verify:
-- `python3 -m menu_sync` imports without error (run from repo root with
+- `python3 -m mahlzeit` imports without error (run from repo root with
   `PYTHONPATH=src`, or `pip install -e .`).
 
-**DoD:** `PYTHONPATH=src python3 -c "import menu_sync"` succeeds; `git status` shows a
+**DoD:** `PYTHONPATH=src python3 -c "import mahlzeit"` succeeds; `git status` shows a
 clean scaffold with only intended files.
 
 ---
@@ -168,7 +168,7 @@ Wire it together (PROJECT.md §8.4).
 Verify: run `refresh` end-to-end with real network; `data/menus.json` matches the §4
 schema and opens cleanly.
 
-**DoD:** `PYTHONPATH=src python3 -m menu_sync refresh` writes a valid `menus.json`;
+**DoD:** `PYTHONPATH=src python3 -m mahlzeit refresh` writes a valid `menus.json`;
 `serve` + browser shows the JSON. A fake source that raises is logged and skipped.
 
 ---

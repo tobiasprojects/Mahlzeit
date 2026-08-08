@@ -1,4 +1,4 @@
-# FoodDashboard — Project Handoff / Plan
+# Mahlzeit — Project Handoff / Plan
 
 A personal dashboard that shows the weekly menus of two Stuttgart-Vaihingen restaurants.
 This file is the single source of truth for the project. If a session is lost, start here.
@@ -26,9 +26,9 @@ Each restaurant is a self-contained **source plugin**, so adding a new restauran
 shared code.
 
 ```
-FoodDashboard/
-├── pyproject.toml            # packaging for src/menu_sync
-├── src/menu_sync/
+Mahlzeit/
+├── pyproject.toml            # packaging for src/mahlzeit
+├── src/mahlzeit/
 │   ├── __init__.py
 │   ├── cli.py                # CLI: `refresh` and `serve`
 │   ├── model.py              # unified schema + validation
@@ -70,7 +70,7 @@ cron (daily ~06:00) or manual `refresh`
 
 New restaurants are added without modifying existing parsers or any shared code:
 
-1. Create `src/menu_sync/sources/<id>.py` implementing the `Source` interface from
+1. Create `src/mahlzeit/sources/<id>.py` implementing the `Source` interface from
    `sources/base.py`: a stable `id`/`name`, a `fetch()` that downloads the raw PDFs
    (handles its own URL discovery, cache-busters, robots.txt / crawl-delay), and a `parse()`
    that converts the extracted PDF text into the unified `model.py` schema.
@@ -264,15 +264,15 @@ Sample PDFs (temp, may be deleted): `/tmp/opencode/vaihingen_wochenkarte.pdf`,
 
 ## 8. Roadmap / next steps (in order)
 
-1. **Scaffold** the repo: `pyproject.toml`, `src/menu_sync/` package skeleton, `.gitignore`
+1. **Scaffold** the repo: `pyproject.toml`, `src/mahlzeit/` package skeleton, `.gitignore`
    (ignore `data/raw/`).
 2. **sources/base.py + registry.py** — define the `Source` interface and the plugin
    registry; `cli.py refresh` iterates the registry so each source's fetch+parse runs in isolation.
 3. **sources/vaihingen.py + sources/roland.py** — implement fetch+parse per restaurant
    (Vaihingen: fixed URL + weekday-block parser; Roland: HTML link discovery + 2-column
    page parser, see §3). Save sample extracted text as fixtures for regression tests.
-4. **store.py + cli.py** — `python -m menu_sync refresh` writes `data/menus.json`;
-   `python -m menu_sync serve` starts a static server (`python -m http.server` over `web/` + `data/`).
+4. **store.py + cli.py** — `python -m mahlzeit refresh` writes `data/menus.json`;
+   `python -m mahlzeit serve` starts a static server (`python -m http.server` over `web/` + `data/`).
 5. **web/** — static dashboard reading `../data/menus.json`.
 6. **Scheduling** — cron `0 6 * * 1-5` (or daily) calling `refresh`. For anywhere-access
    later: GitHub Actions nightly refresh → commit/push `menus.json` → host `web/` on
