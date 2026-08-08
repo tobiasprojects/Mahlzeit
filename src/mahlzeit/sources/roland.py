@@ -130,10 +130,15 @@ class RolandSource(Source):
         dest.write_bytes(data)
 
     def _extract_pdf_links(self, page_html: str) -> List[str]:
-        """Unique, decoded, date-sorted speisenplan PDF links from the page."""
+        """Unique, html-unescaped, date-sorted speisenplan PDF links from the page.
+
+        Hrefs are kept percent-encoded (`%20` etc.) because `urlopen` rejects
+        URLs containing raw spaces; unquoting happens later only when deriving
+        the local filename (`_filename`).
+        """
         links = set()
         for href in re.findall(r'href=["\']([^"\']+\.pdf[^"\']*)["\']', page_html):
-            url = html.unescape(urllib.parse.unquote(href))
+            url = html.unescape(href)  # &amp; -> & ; keep %20 encoded for the request
             if "Speisenplan" in url:
                 links.add(url)
         return sorted(links, key=lambda url: self._link_date_range(url))

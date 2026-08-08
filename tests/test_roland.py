@@ -19,6 +19,16 @@ FIXTURE = Path(__file__).resolve().parent.parent / "testdata" / "roland_sample.t
 
 PDF_BYTES = b"%PDF-1.7 fake pdf content for fetch tests"
 
+# Percent-encoded hrefs as they appear in the HTML; html-unescaped only.
+PDF_URL_A = (
+    "https://rolandsmaultaschen.de/.cm4all/uproc.php/0/"
+    "Speisenplan%20BGHM%20Kantine%2027.07-31.07.2026.pdf?cdp=a&_=19f7b7804f8"
+)
+PDF_URL_B = (
+    "https://rolandsmaultaschen.de/.cm4all/uproc.php/0/"
+    "Speisenplan%20BGHM%20Kantine%2003.08.-14.08.2026.pdf?cdp=a&_=19f9efe2c10"
+)
+
 # Simple page with two speisenplan links (one uses &amp; one uses &), plus an
 # unrelated PDF that must be ignored.
 SAMPLE_HTML = (
@@ -252,14 +262,14 @@ class ParseWrapperTest(unittest.TestCase):
 
 
 class LinkExtractionTest(unittest.TestCase):
-    def test_extract_pdf_links_decodes_dedupes_and_sorts(self):
+    def test_extract_pdf_links_unescapes_dedupes_and_sorts(self):
         links = RolandSource()._extract_pdf_links(SAMPLE_HTML)
         self.assertEqual(2, len(links))
         self.assertIn("27.07-31.07.2026", links[0])   # earlier week first
         self.assertIn("03.08.-14.08.2026", links[1])
         for link in links:
-            self.assertNotIn("%20", link)
-            self.assertNotIn("&amp;", link)
+            self.assertIn("%20", link)  # percent-encoding kept for the request
+            self.assertNotIn("&amp;", link)  # &amp; unescaped to &
             self.assertNotIn("not-a-menu", link)
 
     def test_link_date_range(self):
@@ -295,10 +305,8 @@ class FetchTest(unittest.TestCase):
         pdf_a, pdf_b = PDF_BYTES + b"A", PDF_BYTES + b"B"
         urls = {
             PAGE_URL: _FakeResponse(SAMPLE_HTML.encode()),
-            "https://rolandsmaultaschen.de/.cm4all/uproc.php/0/Speisenplan "
-            "BGHM Kantine 27.07-31.07.2026.pdf?cdp=a&_=19f7b7804f8": _FakeResponse(pdf_a),
-            "https://rolandsmaultaschen.de/.cm4all/uproc.php/0/Speisenplan "
-            "BGHM Kantine 03.08.-14.08.2026.pdf?cdp=a&_=19f9efe2c10": _FakeResponse(pdf_b),
+            PDF_URL_A: _FakeResponse(pdf_a),
+            PDF_URL_B: _FakeResponse(pdf_b),
         }
         opener = self._urlopen(urls)
         with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
@@ -338,13 +346,9 @@ class FetchTest(unittest.TestCase):
     def test_fetch_rejects_non_pdf_response(self):
         urls = {
             PAGE_URL: _FakeResponse(SAMPLE_HTML.encode()),
-            "https://rolandsmaultaschen.de/.cm4all/uproc.php/0/Speisenplan "
-            "BGHM Kantine 27.07-31.07.2026.pdf?cdp=a&_=19f7b7804f8":
-                _FakeResponse(b"<html>not a pdf"),
+            PDF_URL_A: _FakeResponse(b"<html>not a pdf"),
         }
-        opener = self._urlopen(urls, order=[PAGE_URL,
-                                            "https://rolandsmaultaschen.de/.cm4all/uproc.php/0/Speisenplan "
-                                            "BGHM Kantine 27.07-31.07.2026.pdf?cdp=a&_=19f7b7804f8"])
+        opener = self._urlopen(urls, order=[PAGE_URL, PDF_URL_A])
         with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
              mock.patch("mahlzeit.sources.roland.time.sleep"):
             with self.assertRaisesRegex(RuntimeError, "did not return a PDF"):
