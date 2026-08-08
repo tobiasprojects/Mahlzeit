@@ -59,14 +59,23 @@ def main():
     out = os.path.join(root, args.output)
     branch = git("rev-parse", "--abbrev-ref", "HEAD", cwd=root).stdout.strip()
 
-    status = git("status", "--short", cwd=root).stdout
+    status = git("status", "--short", "--untracked-files=all", cwd=root).stdout
     name_only = git("diff", "--name-only", cwd=root).stdout.strip()
+    untracked = [
+        line[3:]
+        for line in status.splitlines()
+        if line.startswith("??")
+    ]
     if git("rev-parse", "--verify", "HEAD", cwd=root).returncode == 0:
         stat = git("diff", "--stat", "HEAD", cwd=root).stdout.strip()
         diff = git("diff", "HEAD", cwd=root).stdout
     else:
         stat = git("diff", "--stat", cwd=root).stdout.strip()
         diff = git("diff", cwd=root).stdout
+    # git diff never includes untracked files; capture them as new-file diffs.
+    # (exit code 1 is expected here -- differences found -- stdout is still valid)
+    for path in untracked:
+        diff += git("diff", "--no-index", "/dev/null", path, cwd=root).stdout
 
     test_cmd = detect_test_command(root)
     if test_cmd:
@@ -123,7 +132,8 @@ def main():
     with open(out, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
 
-    num_files = len([l for l in name_only.splitlines() if l.strip()])
+    tracked_files = [l for l in name_only.splitlines() if l.strip()]
+    num_files = len(tracked_files) + len(untracked)
     print("Report written to {}".format(out))
     print("Files changed: {}".format(num_files))
     print("Tests: {}".format(test_status))
