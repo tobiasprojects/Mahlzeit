@@ -2,6 +2,9 @@
 data/raw/
 data/menus.json
 
+# Generated change reports
+change-report.md
+
 # Python
 __pycache__/
 *.pyc
