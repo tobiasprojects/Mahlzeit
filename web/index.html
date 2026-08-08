@@ -3,11 +3,28 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Mahlzeit</title>
+    <meta name="color-scheme" content="light">
+    <title>Mahlzeit — Menüplan Stuttgart-Vaihingen</title>
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <h1>Mahlzeit</h1>
+    <header class="site-header">
+      <h1>Mahlzeit</h1>
+      <p class="freshness" id="freshness"></p>
+      <div class="stale hidden" id="stale-warning" role="alert"></div>
+      <div class="controls">
+        <label class="filter">
+          <input type="checkbox" id="veggie-filter">
+          <span>Nur vegetarisch / vegan</span>
+        </label>
+      </div>
+      <nav class="week-nav" id="week-nav" aria-label="Wochen"></nav>
+    </header>
+    <main class="columns" id="columns"></main>
+    <footer class="site-footer">
+      <p>Mahlzeit — lokales Projekt. Inhalte stammen aus den Wochenkarten der Restaurants
+        (faktenbasierte Übernahme); Links führen zum jeweiligen Original.</p>
+    </footer>
     <script src="app.js"></script>
   </body>
 </html>

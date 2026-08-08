@@ -1,1 +1,278 @@
-/* Mahlzeit styles */
+:root {
+  --bg: #faf7f2;
+  --fg: #2b2926;
+  --muted: #76736b;
+  --accent: #b5651d;
+  --accent-soft: #f3e3d3;
+  --today-bg: #fdf6e3;
+  --today-border: #ecd9a8;
+  --card: #ffffff;
+  --border: #e3ded5;
+  --danger-bg: #fdecea;
+  --danger-fg: #8a1f1f;
+  --danger-border: #f3c1bc;
+  --vegan-bg: #e4f3e0;
+  --vegan-fg: #2e6b28;
+  --expired: #a09c94;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.45;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 1.1rem 1.5rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.site-header h1 {
+  margin: 0 0 0.2rem;
+  font-size: 1.5rem;
+}
+
+.freshness {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stale {
+  margin: 0.6rem 0 0.2rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--danger-border);
+  border-radius: 0.5rem;
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+.hidden {
+  display: none;
+}
+
+.controls {
+  margin: 0.6rem 0 0;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter input {
+  accent-color: var(--accent);
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.week-nav button {
+  font: inherit;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.week-nav button:hover {
+  border-color: var(--accent);
+}
+
+.week-nav button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.week-nav button.expired:not(.active) {
+  color: var(--expired);
+}
+
+.week-nav button.today-btn {
+  border-style: dashed;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  align-items: start;
+}
+
+.restaurant {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem 1rem 0.4rem;
+}
+
+.restaurant.expired {
+  opacity: 0.62;
+}
+
+.restaurant-name {
+  margin: 0 0 0.2rem;
+  font-size: 1.1rem;
+}
+
+.restaurant-name a {
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.restaurant-name a:hover {
+  text-decoration: underline;
+}
+
+.restaurant-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.restaurant-meta .expired-note {
+  color: var(--danger-fg);
+}
+
+.day {
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.day:first-of-type {
+  border-top: none;
+}
+
+.day.today {
+  margin: 0.2rem 0 0.4rem;
+  padding: 0.6rem;
+  border: 1px solid var(--today-border);
+  border-radius: 0.5rem;
+  background: var(--today-bg);
+}
+
+.day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.weekday {
+  font-weight: 600;
+}
+
+.date {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.meals {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+}
+
+.meal {
+  padding: 0.3rem 0;
+}
+
+.meal + .meal {
+  border-top: 1px dashed var(--border);
+}
+
+.meal-name {
+  display: block;
+}
+
+.meal-tags {
+  margin-left: 0.3rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 0.2rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge.vegan {
+  background: var(--vegan-bg);
+  color: var(--vegan-fg);
+}
+
+.badge.sonderessen {
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+.meal-price {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.85rem;
+}
+
+.meal-allergens {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.meal-none {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.empty-state,
+.error-state {
+  margin: 0;
+  padding: 2rem 1.5rem;
+  color: var(--muted);
+}
+
+.site-footer {
+  padding: 1rem 1.5rem 2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .site-header {
+    position: static;
+    padding: 1rem 1rem 0.8rem;
+  }
+
+  .columns {
+    padding: 1rem;
+  }
+}
