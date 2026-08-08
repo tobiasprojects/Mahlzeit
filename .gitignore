@@ -1,0 +1,10 @@
+# Generated data (raw PDFs must never be committed)
+data/raw/
+data/menus.json
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
