@@ -6,6 +6,20 @@
     <meta name="color-scheme" content="light">
     <title>Mahlzeit — Menüplan Stuttgart-Vaihingen</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+      (function () {
+        var saved = null;
+        try {
+          saved = localStorage.getItem("mahlzeit-theme");
+        } catch (_) {}
+        var theme =
+          saved ||
+          (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (meta) meta.content = theme;
+      })();
+    </script>
   </head>
   <body>
     <header class="site-header">
@@ -17,6 +31,8 @@
           <input type="checkbox" id="veggie-filter">
           <span>Nur vegetarisch / vegan</span>
         </label>
+        <button type="button" id="theme-toggle" class="theme-toggle"
+          aria-pressed="false">Dunkelmodus</button>
       </div>
       <nav class="week-nav" id="week-nav" aria-label="Wochen"></nav>
     </header>

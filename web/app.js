@@ -14,6 +14,42 @@ const weekNavEl = document.getElementById("week-nav");
 const columnsEl = document.getElementById("columns");
 const veggieFilterEl = document.getElementById("veggie-filter");
 
+const STORAGE_KEY = "mahlzeit-theme";
+const themeToggleEl = document.getElementById("theme-toggle");
+const colorSchemeMeta = document.querySelector('meta[name="color-scheme"]');
+const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function setTheme(theme, persist) {
+  document.documentElement.dataset.theme = theme;
+  if (colorSchemeMeta) colorSchemeMeta.content = theme;
+  if (persist) {
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch (_) {}
+  }
+  const dark = theme === "dark";
+  themeToggleEl.textContent = dark ? "Hellmodus" : "Dunkelmodus";
+  themeToggleEl.setAttribute("aria-pressed", String(dark));
+}
+
+themeToggleEl.addEventListener("click", () => {
+  setTheme(currentTheme() === "dark" ? "light" : "dark", true);
+});
+
+systemDark.addEventListener("change", (e) => {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(STORAGE_KEY);
+  } catch (_) {}
+  if (!saved) setTheme(e.matches ? "dark" : "light", false);
+});
+
+setTheme(currentTheme(), false);
+
 function pad2(n) {
   return String(n).padStart(2, "0");
 }

@@ -14,6 +14,20 @@
     <meta name="color-scheme" content="light" />
     <title>Impressum — Mahlzeit</title>
     <link rel="stylesheet" href="style.css" />
+    <script>
+      (function () {
+        var saved = null;
+        try {
+          saved = localStorage.getItem("mahlzeit-theme");
+        } catch (_) {}
+        var theme =
+          saved ||
+          (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (meta) meta.content = theme;
+      })();
+    </script>
   </head>
   <body>
     <header class="site-header">
