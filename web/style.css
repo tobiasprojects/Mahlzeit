@@ -260,10 +260,40 @@ body {
   color: var(--muted);
 }
 
+.legal {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 2rem;
+}
+
+.legal h2 {
+  margin: 1.4rem 0 0.4rem;
+  font-size: 1.05rem;
+}
+
+.legal p {
+  margin: 0.3rem 0 0.8rem;
+}
+
+.legal a {
+  color: var(--accent);
+}
+
 .site-footer {
   padding: 1rem 1.5rem 2rem;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.footer-links a {
+  color: var(--fg);
 }
 
 @media (max-width: 640px) {

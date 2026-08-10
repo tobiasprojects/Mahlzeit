@@ -1,0 +1,79 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 5 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute cache week
+        id: week
+        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache raw PDFs
+        id: cache-raw
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: raw-${{ runner.os }}-${{ steps.week.outputs.week }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install poppler-utils
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - name: Install package
+        run: pip install -e .[dev]
+
+      - name: Refresh menus
+        run: python -m mahlzeit refresh
+
+      - name: Build publish directory
+        run: |
+          mkdir -p _site/data
+          cp -R web/. _site/
+          cp data/menus.json _site/data/menus.json
+
+      - name: Generate Impressum
+        run: |
+          if [ -z "$IMPRESSUM" ]; then
+            echo "::error::Secret IMPRESSUM is not set; refusing to deploy without an Impressum" >&2
+            exit 1
+          fi
+          printf '%s\n' "$IMPRESSUM" > _site/impressum.html
+        env:
+          IMPRESSUM: ${{ secrets.IMPRESSUM }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
