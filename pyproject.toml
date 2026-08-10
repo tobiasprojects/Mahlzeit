@@ -9,6 +9,9 @@ description = "Sync weekly canteen menus from restaurant PDFs to a static dashbo
 requires-python = ">=3.10"
 dependencies = []
 
+[project.scripts]
+mahlzeit = "mahlzeit.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
