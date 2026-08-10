@@ -7,11 +7,11 @@ cases. `fetch()` is tested with a mocked HTTP layer so the suite needs no
 network and never hits the site.
 """
 
-import tempfile
-import unittest
 import urllib.request
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 from mahlzeit.sources.roland import PAGE_URL, RolandSource
 
@@ -44,6 +44,8 @@ SAMPLE_HTML = (
 # (weekday, [(type, name, internal, external, vegan, sonderessen, allergens)])
 WEEK_1 = "2026-08-03", "2026-08-07"
 WEEK_2 = "2026-08-10", "2026-08-14"
+WEEK_1_DATES = ["2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07"]
+WEEK_2_DATES = ["2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"]
 WEEK_1_MEALS = {
     "Montag": [
         ("Menü 1", "Hackbällchen Ragout mit Paprika, Zucchini, Tomatensauce und Kichererbsen",
@@ -116,6 +118,12 @@ def _parse_fixture():
     return [RolandSource().parse_page(page) for page in text.split("\f") if page.strip()]
 
 
+@pytest.fixture(scope="module")
+def weeks():
+    """The committed fixture parses to the weeks the real PDF shows."""
+    return _parse_fixture()
+
+
 class _FakeResponse:
     """Minimal `urlopen` context-manager response with a fixed body."""
 
@@ -132,227 +140,214 @@ class _FakeResponse:
         return self._data
 
 
-class FixtureParseTest(unittest.TestCase):
-    """The committed fixture parses to the weeks the real PDF shows."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.weeks = _parse_fixture()
-
-    def test_two_weeks_one_per_page(self):
-        self.assertEqual(2, len(self.weeks))
-        self.assertEqual([WEEK_1[0], WEEK_2[0]], [w.from_date for w in self.weeks])
-        self.assertEqual([WEEK_1[1], WEEK_2[1]], [w.to_date for w in self.weeks])
-
-    def test_five_days_monday_to_friday(self):
-        for week in self.weeks:
-            with self.subTest(week=week.from_date):
-                self.assertEqual(["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"],
-                                 [day.weekday for day in week.days])
-
-    def test_day_dates_run_monday_to_friday(self):
-        for week, start, end in ((self.weeks[0], WEEK_1[0], WEEK_1[1]),
-                                 (self.weeks[1], WEEK_2[0], WEEK_2[1])):
-            with self.subTest(week=start):
-                self.assertEqual(
-                    ["2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07"]
-                    if start == WEEK_1[0]
-                    else ["2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"],
-                    [day.date for day in week.days],
-                )
-
-    def test_two_meals_per_day(self):
-        for week in self.weeks:
-            for day in week.days:
-                self.assertEqual(2, len(day.meals), f"{week.from_date} {day.weekday}")
-                self.assertEqual({"Menü 1", "Menü 2"}, {m.type for m in day.meals})
-
-    def test_expected_meals(self):
-        for week, expected in ((self.weeks[0], WEEK_1_MEALS), (self.weeks[1], WEEK_2_MEALS)):
-            for day in week.days:
-                with self.subTest(day=day.weekday):
-                    actual = [
-                        (m.type, m.name, m.price_internal, m.price_external,
-                         m.vegan, m.sonderessen, m.allergens)
-                        for m in day.meals
-                    ]
-                    self.assertEqual(expected[day.weekday], actual)
-
-    def test_menu_2_is_vegan(self):
-        for week in self.weeks:
-            for day in week.days:
-                vegan = {m.type: m.vegan for m in day.meals}
-                self.assertFalse(vegan["Menü 1"], f"{week.from_date} {day.weekday}")
-                self.assertTrue(vegan["Menü 2"], f"{week.from_date} {day.weekday}")
-
-    def test_sonderessen_overrides_prices(self):
-        for week in self.weeks:
-            for day in week.days:
-                for meal in day.meals:
-                    if meal.sonderessen:
-                        self.assertEqual(meal.price_internal, meal.price_external)
-                        self.assertIsNotNone(meal.price_internal)
-                        self.assertNotEqual(meal.price_internal, 6.0)
-
-    def test_hyphenated_words_are_rejoined(self):
-        donners = next(d for d in self.weeks[0].days if d.weekday == "Donnerstag")
-        menue1 = next(m for m in donners.meals if m.type == "Menü 1")
-        self.assertEqual("Gratinierte Hähnchenfilets a la Caprese mit Tomaten, "
-                         "Mozzarella dazu Kräuter-Knoblauch Baguette", menue1.name)
-
-    def test_names_are_whitespace_collapsed(self):
-        for week in self.weeks:
-            for day in week.days:
-                for meal in day.meals:
-                    self.assertEqual(meal.name, " ".join(meal.name.split()))
-
-    def test_no_header_or_footer_content_leaks_into_meals(self):
-        forbidden = ("Partyservice", "Öffnungszeiten", "❖", "Zusatzstoffe", "E-Mail",
-                     "www.Rolands", "Telefon", "06131", "0173", "Menü 1 u. 2")
-        for week in self.weeks:
-            for day in week.days:
-                for meal in day.meals:
-                    with self.subTest(name=meal.name):
-                        for token in forbidden:
-                            self.assertNotIn(token, meal.name)
-
-    def test_weeks_validate(self):
-        for week in self.weeks:
-            week.validate()
+def test_two_weeks_one_per_page(weeks):
+    assert 2 == len(weeks)
+    assert [WEEK_1[0], WEEK_2[0]] == [w.from_date for w in weeks]
+    assert [WEEK_1[1], WEEK_2[1]] == [w.to_date for w in weeks]
 
 
-class DateRangeTest(unittest.TestCase):
-    def test_missing_date_range_raises(self):
-        with self.assertRaisesRegex(ValueError, "Vom"):
-            RolandSource().parse_page("Kein Datum hier\n   Montag\n   X\n")
-
-    def test_from_date_without_year_inherits_to_year(self):
-        week = RolandSource().parse_page(_page("Vom 03.08. – 07.08.2026"))
-        self.assertEqual("2026-08-03", week.from_date)
-        self.assertEqual("2026-08-07", week.to_date)
-
-    def test_both_dates_with_years_cross_year_boundary(self):
-        week = RolandSource().parse_page(_page("Vom 29.12.2025 – 02.01.2026"))
-        self.assertEqual("2025-12-29", week.from_date)
-        self.assertEqual("2026-01-02", week.to_date)
+def test_five_days_monday_to_friday(weeks):
+    for week in weeks:
+        assert ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"] == [
+            day.weekday for day in week.days
+        ]
 
 
-class StructureErrorTest(unittest.TestCase):
-    def test_no_menu_body_raises(self):
-        with self.assertRaisesRegex(ValueError, "one meal per weekday"):
-            RolandSource().parse_page("Vom 03.08. – 07.08.2026\nnur Kopfzeilen\n")
-
-    def test_missing_weekday_raises(self):
-        text = _page("Vom 03.08. – 07.08.2026",
-                     weekdays=("Montag", "Dienstag", "Mittwoch", "Donnerstag"))
-        with self.assertRaisesRegex(ValueError, "one meal per weekday"):
-            RolandSource().parse_page(text)
+def test_day_dates_run_monday_to_friday(weeks):
+    for week, dates in ((weeks[0], WEEK_1_DATES), (weeks[1], WEEK_2_DATES)):
+        assert dates == [day.date for day in week.days]
 
 
-class ParseWrapperTest(unittest.TestCase):
-    def test_parse_runs_pdftotext_and_returns_list_of_weeks(self):
-        source = RolandSource()
-        pdf_path = Path("/tmp/fake-roland.pdf")
-        with mock.patch("mahlzeit.sources.roland.run_pdftotext",
-                        return_value=FIXTURE.read_text(encoding="utf-8")) as run:
-            weeks = source.parse([pdf_path])
-        run.assert_called_once_with(pdf_path)
-        self.assertEqual(2, len(weeks))
-        self.assertEqual(["2026-08-03", "2026-08-10"], [w.from_date for w in weeks])
+def test_two_meals_per_day(weeks):
+    for week in weeks:
+        for day in week.days:
+            assert 2 == len(day.meals), f"{week.from_date} {day.weekday}"
+            assert {"Menü 1", "Menü 2"} == {m.type for m in day.meals}
 
 
-class LinkExtractionTest(unittest.TestCase):
-    def test_extract_pdf_links_unescapes_dedupes_and_sorts(self):
-        links = RolandSource()._extract_pdf_links(SAMPLE_HTML)
-        self.assertEqual(2, len(links))
-        self.assertIn("27.07-31.07.2026", links[0])   # earlier week first
-        self.assertIn("03.08.-14.08.2026", links[1])
-        for link in links:
-            self.assertIn("%20", link)  # percent-encoding kept for the request
-            self.assertNotIn("&amp;", link)  # &amp; unescaped to &
-            self.assertNotIn("not-a-menu", link)
-
-    def test_link_date_range(self):
-        source = RolandSource()
-        self.assertEqual(
-            ("2026-07-27", "2026-07-31"),
-            source._link_date_range("Speisenplan 27.07-31.07.2026.pdf"),
-        )
-        self.assertEqual(
-            ("2026-08-03", "2026-08-14"),
-            source._link_date_range("Speisenplan 03.08.-14.08.2026.pdf"),
-        )
-
-    def test_link_without_date_range_raises(self):
-        with self.assertRaisesRegex(ValueError, "date range"):
-            RolandSource()._link_date_range("Speisenplan.pdf")
+def test_expected_meals(weeks):
+    for week, expected in ((weeks[0], WEEK_1_MEALS), (weeks[1], WEEK_2_MEALS)):
+        for day in week.days:
+            actual = [
+                (m.type, m.name, m.price_internal, m.price_external,
+                 m.vegan, m.sonderessen, m.allergens)
+                for m in day.meals
+            ]
+            assert expected[day.weekday] == actual
 
 
-class FetchTest(unittest.TestCase):
-    def setUp(self):
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self.cache_dir = Path(self._tmpdir.name)
-        self.addCleanup(self._tmpdir.cleanup)
+def test_menu_2_is_vegan(weeks):
+    for week in weeks:
+        for day in week.days:
+            vegan = {m.type: m.vegan for m in day.meals}
+            assert not vegan["Menü 1"], f"{week.from_date} {day.weekday}"
+            assert vegan["Menü 2"], f"{week.from_date} {day.weekday}"
 
-    def _urlopen(self, urls_to_data, order=None):
-        """Mock urlopen returning `urls_to_data[full_url]` in call order."""
-        opener = mock.MagicMock()
-        order = list(urls_to_data) if order is None else order
-        opener.side_effect = [urls_to_data[url] for url in order]
-        return opener
 
-    def test_fetch_downloads_all_menu_pdfs_with_crawl_delay(self):
-        pdf_a, pdf_b = PDF_BYTES + b"A", PDF_BYTES + b"B"
-        urls = {
-            PAGE_URL: _FakeResponse(SAMPLE_HTML.encode()),
-            PDF_URL_A: _FakeResponse(pdf_a),
-            PDF_URL_B: _FakeResponse(pdf_b),
-        }
-        opener = self._urlopen(urls)
-        with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
-             mock.patch("mahlzeit.sources.roland.time.sleep") as sleep:
-            paths = RolandSource().fetch(self.cache_dir)
+def test_sonderessen_overrides_prices(weeks):
+    for week in weeks:
+        for day in week.days:
+            for meal in day.meals:
+                if meal.sonderessen:
+                    assert meal.price_internal == meal.price_external
+                    assert meal.price_internal is not None
+                    assert meal.price_internal != 6.0
 
-        self.assertEqual(3, opener.call_count)
-        self.assertEqual(2, sleep.call_count)  # one delay per PDF request
-        self.assertEqual(2, len(paths))
-        for path in paths:
-            self.assertTrue(path.is_file(), path)
-            self.assertIn(path.read_bytes(), (pdf_a, pdf_b))
-        self.assertEqual(
-            {"Speisenplan BGHM Kantine 27.07-31.07.2026.pdf",
-             "Speisenplan BGHM Kantine 03.08.-14.08.2026.pdf"},
-            {p.name for p in paths},
-        )
 
-    def test_fetch_skips_weeks_already_cached(self):
-        target = self.cache_dir / "roland"
-        target.mkdir(parents=True)
-        (target / "Speisenplan BGHM Kantine 03.08.-14.08.2026.pdf").write_bytes(PDF_BYTES)
-        (target / "Speisenplan BGHM Kantine 27.07-31.07.2026.pdf").write_bytes(PDF_BYTES)
+def test_hyphenated_words_are_rejoined(weeks):
+    donners = next(d for d in weeks[0].days if d.weekday == "Donnerstag")
+    menue1 = next(m for m in donners.meals if m.type == "Menü 1")
+    assert ("Gratinierte Hähnchenfilets a la Caprese mit Tomaten, "
+            "Mozzarella dazu Kräuter-Knoblauch Baguette") == menue1.name
 
-        urls = {PAGE_URL: _FakeResponse(SAMPLE_HTML.encode())}
-        opener = self._urlopen(urls)
-        with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
-             mock.patch("mahlzeit.sources.roland.time.sleep") as sleep:
-            paths = RolandSource().fetch(self.cache_dir)
 
-        self.assertEqual(1, opener.call_count)  # only the HTML request
-        self.assertEqual(0, sleep.call_count)
-        self.assertEqual(2, len(paths))
-        for path in paths:
-            self.assertEqual(PDF_BYTES, path.read_bytes())
+def test_names_are_whitespace_collapsed(weeks):
+    for week in weeks:
+        for day in week.days:
+            for meal in day.meals:
+                assert meal.name == " ".join(meal.name.split())
 
-    def test_fetch_rejects_non_pdf_response(self):
-        urls = {
-            PAGE_URL: _FakeResponse(SAMPLE_HTML.encode()),
-            PDF_URL_A: _FakeResponse(b"<html>not a pdf"),
-        }
-        opener = self._urlopen(urls, order=[PAGE_URL, PDF_URL_A])
-        with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
-             mock.patch("mahlzeit.sources.roland.time.sleep"):
-            with self.assertRaisesRegex(RuntimeError, "did not return a PDF"):
-                RolandSource().fetch(self.cache_dir)
+
+def test_no_header_or_footer_content_leaks_into_meals(weeks):
+    forbidden = ("Partyservice", "Öffnungszeiten", "❖", "Zusatzstoffe", "E-Mail",
+                 "www.Rolands", "Telefon", "06131", "0173", "Menü 1 u. 2")
+    for week in weeks:
+        for day in week.days:
+            for meal in day.meals:
+                for token in forbidden:
+                    assert token not in meal.name
+
+
+def test_weeks_validate(weeks):
+    for week in weeks:
+        week.validate()
+
+
+def test_missing_date_range_raises():
+    with pytest.raises(ValueError, match="Vom"):
+        RolandSource().parse_page("Kein Datum hier\n   Montag\n   X\n")
+
+
+def test_from_date_without_year_inherits_to_year():
+    week = RolandSource().parse_page(_page("Vom 03.08. – 07.08.2026"))
+    assert "2026-08-03" == week.from_date
+    assert "2026-08-07" == week.to_date
+
+
+def test_both_dates_with_years_cross_year_boundary():
+    week = RolandSource().parse_page(_page("Vom 29.12.2025 – 02.01.2026"))
+    assert "2025-12-29" == week.from_date
+    assert "2026-01-02" == week.to_date
+
+
+def test_no_menu_body_raises():
+    with pytest.raises(ValueError, match="one meal per weekday"):
+        RolandSource().parse_page("Vom 03.08. – 07.08.2026\nnur Kopfzeilen\n")
+
+
+def test_missing_weekday_raises():
+    text = _page("Vom 03.08. – 07.08.2026",
+                 weekdays=("Montag", "Dienstag", "Mittwoch", "Donnerstag"))
+    with pytest.raises(ValueError, match="one meal per weekday"):
+        RolandSource().parse_page(text)
+
+
+def test_parse_runs_pdftotext_and_returns_list_of_weeks():
+    source = RolandSource()
+    pdf_path = Path("/tmp/fake-roland.pdf")
+    with mock.patch("mahlzeit.sources.roland.run_pdftotext",
+                    return_value=FIXTURE.read_text(encoding="utf-8")) as run:
+        weeks = source.parse([pdf_path])
+    run.assert_called_once_with(pdf_path)
+    assert 2 == len(weeks)
+    assert ["2026-08-03", "2026-08-10"] == [w.from_date for w in weeks]
+
+
+def test_extract_pdf_links_unescapes_dedupes_and_sorts():
+    links = RolandSource()._extract_pdf_links(SAMPLE_HTML)
+    assert 2 == len(links)
+    assert "27.07-31.07.2026" in links[0]   # earlier week first
+    assert "03.08.-14.08.2026" in links[1]
+    for link in links:
+        assert "%20" in link  # percent-encoding kept for the request
+        assert "&amp;" not in link  # &amp; unescaped to &
+        assert "not-a-menu" not in link
+
+
+def test_link_date_range():
+    source = RolandSource()
+    assert ("2026-07-27", "2026-07-31") == source._link_date_range(
+        "Speisenplan 27.07-31.07.2026.pdf"
+    )
+    assert ("2026-08-03", "2026-08-14") == source._link_date_range(
+        "Speisenplan 03.08.-14.08.2026.pdf"
+    )
+
+
+def test_link_without_date_range_raises():
+    with pytest.raises(ValueError, match="date range"):
+        RolandSource()._link_date_range("Speisenplan.pdf")
+
+
+def _urlopen(urls_to_data, order=None):
+    """Mock urlopen returning `urls_to_data[full_url]` in call order."""
+    opener = mock.MagicMock()
+    order = list(urls_to_data) if order is None else order
+    opener.side_effect = [urls_to_data[url] for url in order]
+    return opener
+
+
+def test_fetch_downloads_all_menu_pdfs_with_crawl_delay(tmp_path):
+    pdf_a, pdf_b = PDF_BYTES + b"A", PDF_BYTES + b"B"
+    urls = {
+        PAGE_URL: _FakeResponse(SAMPLE_HTML.encode()),
+        PDF_URL_A: _FakeResponse(pdf_a),
+        PDF_URL_B: _FakeResponse(pdf_b),
+    }
+    opener = _urlopen(urls)
+    with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
+         mock.patch("mahlzeit.sources.roland.time.sleep") as sleep:
+        paths = RolandSource().fetch(tmp_path)
+
+    assert 3 == opener.call_count
+    assert 2 == sleep.call_count  # one delay per PDF request
+    assert 2 == len(paths)
+    for path in paths:
+        assert path.is_file(), path
+        assert path.read_bytes() in (pdf_a, pdf_b)
+    assert {"Speisenplan BGHM Kantine 27.07-31.07.2026.pdf",
+            "Speisenplan BGHM Kantine 03.08.-14.08.2026.pdf"} == {p.name for p in paths}
+
+
+def test_fetch_skips_weeks_already_cached(tmp_path):
+    target = tmp_path / "roland"
+    target.mkdir(parents=True)
+    (target / "Speisenplan BGHM Kantine 03.08.-14.08.2026.pdf").write_bytes(PDF_BYTES)
+    (target / "Speisenplan BGHM Kantine 27.07-31.07.2026.pdf").write_bytes(PDF_BYTES)
+
+    urls = {PAGE_URL: _FakeResponse(SAMPLE_HTML.encode())}
+    opener = _urlopen(urls)
+    with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
+         mock.patch("mahlzeit.sources.roland.time.sleep") as sleep:
+        paths = RolandSource().fetch(tmp_path)
+
+    assert 1 == opener.call_count  # only the HTML request
+    assert 0 == sleep.call_count
+    assert 2 == len(paths)
+    for path in paths:
+        assert PDF_BYTES == path.read_bytes()
+
+
+def test_fetch_rejects_non_pdf_response(tmp_path):
+    urls = {
+        PAGE_URL: _FakeResponse(SAMPLE_HTML.encode()),
+        PDF_URL_A: _FakeResponse(b"<html>not a pdf"),
+    }
+    opener = _urlopen(urls, order=[PAGE_URL, PDF_URL_A])
+    with mock.patch("mahlzeit.sources.roland.urllib.request.urlopen", opener), \
+         mock.patch("mahlzeit.sources.roland.time.sleep"):
+        with pytest.raises(RuntimeError, match="did not return a PDF"):
+            RolandSource().fetch(tmp_path)
 
 
 def _page(date_line, weekdays=("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag")):
@@ -367,7 +362,3 @@ def _page(date_line, weekdays=("Montag", "Dienstag", "Mittwoch", "Donnerstag", "
         right = f"Beilage {index + 1} (a1|2, c, d, k, m)"
         lines.append(left.ljust(95) + right)
     return "\n".join(lines)
-
-
-if __name__ == "__main__":
-    unittest.main()

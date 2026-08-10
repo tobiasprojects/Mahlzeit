@@ -10,9 +10,10 @@ import shutil
 import sys
 import tempfile
 import textwrap
-import unittest
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 import mahlzeit.registry as registry
 from mahlzeit.registry import all_sources, get_source
@@ -37,23 +38,22 @@ SOURCE = textwrap.dedent(
 )
 
 
-class TempPackageMixin:
-    """setUp/tearDown for a throwaway importable package under `sys.path`."""
+class TempPackage:
+    """Throwaway importable package under `sys.path`."""
 
-    def setUp(self):
+    def __init__(self):
         self._tmpdir = tempfile.mkdtemp()
         self.package_dir = Path(self._tmpdir) / "test_sources"
         self.package_dir.mkdir()
         (self.package_dir / "__init__.py").write_text("")
         sys.path.insert(0, self._tmpdir)
-        self.addCleanup(self._remove_modules)
-        self.addCleanup(sys.path.remove, self._tmpdir)
-        self.addCleanup(shutil.rmtree, self._tmpdir, ignore_errors=True)
 
-    def _remove_modules(self):
+    def cleanup(self):
         for name in list(sys.modules):
             if name == "test_sources" or name.startswith("test_sources."):
                 del sys.modules[name]
+        sys.path.remove(self._tmpdir)
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def write_source(self, name, class_name, id_value):
         (self.package_dir / f"{name}.py").write_text(
@@ -66,67 +66,79 @@ class TempPackageMixin:
         )
 
 
-class DiscoveryTest(TempPackageMixin, unittest.TestCase):
-    def test_discovers_instances_keyed_by_id(self):
-        self.write_source("dummy", "Dummy", "dummy")
-        sources = self.discover()
-        self.assertEqual({"dummy"}, set(sources))
-        source = sources["dummy"]
-        self.assertIsInstance(source, Source)
-        self.assertEqual("dummy", source.id)
-        self.assertEqual("Test", source.name)
-        self.assertEqual("https://example.invalid/dummy", source.source_url)
+@pytest.fixture
+def temp_package():
+    package = TempPackage()
+    yield package
+    package.cleanup()
 
-    def test_discovery_returns_working_instances(self):
-        self.write_source("dummy", "Dummy", "dummy")
-        source = self.discover()["dummy"]
-        self.assertEqual([], source.fetch(Path("unused")))
-        self.assertEqual([], source.parse([]))
 
-    def test_skips_non_source_classes(self):
-        (self.package_dir / "mixed.py").write_text(
-            textwrap.dedent(
-                """\
-                from mahlzeit.sources.base import Source
+def test_discovers_instances_keyed_by_id(temp_package):
+    temp_package.write_source("dummy", "Dummy", "dummy")
+    sources = temp_package.discover()
+    assert {"dummy"} == set(sources)
+    source = sources["dummy"]
+    assert isinstance(source, Source)
+    assert "dummy" == source.id
+    assert "Test" == source.name
+    assert "https://example.invalid/dummy" == source.source_url
 
-                class Helper:
-                    id = "helper"
 
-                class Real(Source):
-                    id = "mixed"
-                    name = "Mixed"
-                    source_url = "https://example.invalid/mixed"
+def test_discovery_returns_working_instances(temp_package):
+    temp_package.write_source("dummy", "Dummy", "dummy")
+    source = temp_package.discover()["dummy"]
+    assert [] == source.fetch(Path("unused"))
+    assert [] == source.parse([])
 
-                    def fetch(self, cache_dir):
-                        return []
 
-                    def parse(self, pdf_paths):
-                        return []
-                """
-            )
+def test_skips_non_source_classes(temp_package):
+    (temp_package.package_dir / "mixed.py").write_text(
+        textwrap.dedent(
+            """\
+            from mahlzeit.sources.base import Source
+
+            class Helper:
+                id = "helper"
+
+            class Real(Source):
+                id = "mixed"
+                name = "Mixed"
+                source_url = "https://example.invalid/mixed"
+
+                def fetch(self, cache_dir):
+                    return []
+
+                def parse(self, pdf_paths):
+                    return []
+            """
         )
-        sources = self.discover()
-        self.assertEqual({"mixed"}, set(sources))
-        self.assertEqual("mixed", sources["mixed"].id)
+    )
+    sources = temp_package.discover()
+    assert {"mixed"} == set(sources)
+    assert "mixed" == sources["mixed"].id
 
-    def test_skips_modules_without_sources(self):
-        (self.package_dir / "base.py").write_text(
-            "from mahlzeit.sources.base import Source\n"
-        )
-        self.assertEqual({}, self.discover())
 
-    def test_skips_sources_without_id(self):
-        self.write_source("noid", "NoId", "")
-        self.assertEqual({}, self.discover())
+def test_skips_modules_without_sources(temp_package):
+    (temp_package.package_dir / "base.py").write_text(
+        "from mahlzeit.sources.base import Source\n"
+    )
+    assert {} == temp_package.discover()
 
-    def test_empty_package_discovers_nothing(self):
-        self.assertEqual({}, self.discover())
 
-    def test_duplicate_id_raises(self):
-        self.write_source("a", "A", "dup")
-        self.write_source("b", "B", "dup")
-        with self.assertRaisesRegex(RuntimeError, "duplicate source id: 'dup'"):
-            self.discover()
+def test_skips_sources_without_id(temp_package):
+    temp_package.write_source("noid", "NoId", "")
+    assert {} == temp_package.discover()
+
+
+def test_empty_package_discovers_nothing(temp_package):
+    assert {} == temp_package.discover()
+
+
+def test_duplicate_id_raises(temp_package):
+    temp_package.write_source("a", "A", "dup")
+    temp_package.write_source("b", "B", "dup")
+    with pytest.raises(RuntimeError, match="duplicate source id: 'dup'"):
+        temp_package.discover()
 
 
 class _FakeSource(Source):
@@ -141,42 +153,42 @@ class _FakeSource(Source):
         return []
 
 
-class RegistryTest(unittest.TestCase):
-    def test_all_sources_returns_discovered_instances(self):
-        sources = all_sources()
-        self.assertIsInstance(sources, list)
-        for source in sources:
-            self.assertIsInstance(source, Source)
-            self.assertTrue(source.id)
-            self.assertTrue(source.name)
-            self.assertTrue(source.source_url)
-
-    def test_all_sources_ids_are_unique(self):
-        ids = [source.id for source in all_sources()]
-        self.assertEqual(len(ids), len(set(ids)))
-
-    def test_get_source_returns_registered_instance(self):
-        for source in all_sources():
-            self.assertIs(get_source(source.id), source)
-
-    def test_unknown_source_raises_key_error(self):
-        with self.assertRaises(KeyError):
-            get_source("does-not-exist")
-
-    def test_unknown_source_error_lists_available(self):
-        available = sorted(source.id for source in all_sources())
-        with self.assertRaises(KeyError) as ctx:
-            get_source("does-not-exist")
-        self.assertIn("does-not-exist", str(ctx.exception))
-        for source_id in available:
-            self.assertIn(source_id, str(ctx.exception))
-
-    def test_registry_mirrors_sources_dict(self):
-        fake = _FakeSource()
-        with mock.patch.object(registry, "SOURCES", {"fake": fake}):
-            self.assertEqual([fake], all_sources())
-            self.assertIs(fake, get_source("fake"))
+def test_all_sources_returns_discovered_instances():
+    sources = all_sources()
+    assert isinstance(sources, list)
+    for source in sources:
+        assert isinstance(source, Source)
+        assert source.id
+        assert source.name
+        assert source.source_url
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_all_sources_ids_are_unique():
+    ids = [source.id for source in all_sources()]
+    assert len(ids) == len(set(ids))
+
+
+def test_get_source_returns_registered_instance():
+    for source in all_sources():
+        assert get_source(source.id) is source
+
+
+def test_unknown_source_raises_key_error():
+    with pytest.raises(KeyError):
+        get_source("does-not-exist")
+
+
+def test_unknown_source_error_lists_available():
+    available = sorted(source.id for source in all_sources())
+    with pytest.raises(KeyError) as ctx:
+        get_source("does-not-exist")
+    assert "does-not-exist" in str(ctx.value)
+    for source_id in available:
+        assert source_id in str(ctx.value)
+
+
+def test_registry_mirrors_sources_dict():
+    fake = _FakeSource()
+    with mock.patch.object(registry, "SOURCES", {"fake": fake}):
+        assert [fake] == all_sources()
+        assert fake is get_source("fake")

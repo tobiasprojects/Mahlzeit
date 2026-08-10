@@ -6,11 +6,12 @@ hand-crafted inputs for error handling and date-range edge cases. `fetch()` is
 tested with a mocked HTTP layer so the suite needs no network.
 """
 
-import tempfile
-import unittest
+import re
 import urllib.request
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 from mahlzeit.sources.vaihingen import SOURCE_URL, WEEKDAYS, VaihingenSource
 
@@ -96,161 +97,162 @@ class _FakeResponse:
         return self._data
 
 
-class FixtureParseTest(unittest.TestCase):
+@pytest.fixture(scope="module")
+def week():
     """The committed fixture parses to the week the real PDF shows."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.week = VaihingenSource().parse_text(FIXTURE.read_text(encoding="utf-8"))
-
-    def test_week_dates(self):
-        self.assertEqual("2026-08-03", self.week.from_date)
-        self.assertEqual("2026-08-07", self.week.to_date)
-
-    def test_five_days_monday_to_friday(self):
-        self.assertEqual(5, len(self.week.days))
-        self.assertEqual(["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"],
-                         [day.weekday for day in self.week.days])
-
-    def test_day_dates_match_week(self):
-        self.assertEqual(["2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06",
-                          "2026-08-07"], [day.date for day in self.week.days])
-
-    def test_three_meals_per_day(self):
-        for day in self.week.days:
-            self.assertEqual(3, len(day.meals), day.weekday)
-
-    def test_names_and_vegan_flags(self):
-        for date, weekday, meals in EXPECTED:
-            with self.subTest(day=weekday):
-                day = next(d for d in self.week.days if d.date == date)
-                self.assertEqual(weekday, day.weekday)
-                self.assertEqual(
-                    [(meal.name, meal.vegan) for meal in day.meals], meals)
-
-    def test_vegan_marker_is_stripped_from_name(self):
-        for day in self.week.days:
-            for meal in day.meals:
-                self.assertNotRegex(meal.name, r"\([vV]\)\s*$", meal.name)
-
-    def test_non_vegan_parenthetical_is_kept(self):
-        chowder = self.week.days[1].meals[2]
-        self.assertFalse(chowder.vegan)
-        self.assertEqual("Seafood Chowder (Fisch Eintopf)", chowder.name)
-
-    def test_names_are_whitespace_collapsed(self):
-        for day in self.week.days:
-            for meal in day.meals:
-                self.assertEqual(meal.name, " ".join(meal.name.split()))
-
-    def test_meals_are_standard_without_prices_allergens(self):
-        for day in self.week.days:
-            for meal in day.meals:
-                self.assertEqual("Standard", meal.type)
-                self.assertIsNone(meal.price_internal)
-                self.assertIsNone(meal.price_external)
-                self.assertIsNone(meal.allergens)
-                self.assertFalse(meal.sonderessen)
-                self.assertNotIn("price_internal", meal.to_dict())
-                self.assertNotIn("allergens", meal.to_dict())
-
-    def test_week_validates(self):
-        self.week.validate()
+    return VaihingenSource().parse_text(FIXTURE.read_text(encoding="utf-8"))
 
 
-class DateRangeTest(unittest.TestCase):
-    def test_from_date_without_year_inherits_to_year(self):
-        week = VaihingenSource().parse_text(make_text())
-        self.assertEqual("2026-08-03", week.from_date)
-        self.assertEqual("2026-08-07", week.to_date)
-
-    def test_both_dates_with_years_cross_year_boundary(self):
-        text = make_text("  Wochenkarte vom 29.12.2025 – 02.01.2026")
-        week = VaihingenSource().parse_text(text)
-        self.assertEqual("2025-12-29", week.from_date)
-        self.assertEqual("2026-01-02", week.to_date)
-
-    def test_missing_date_range_raises(self):
-        text = "  Montag\n   A\n   B\n   C\n"
-        with self.assertRaisesRegex(ValueError, "Wochenkarte"):
-            VaihingenSource().parse_text(text)
-
-    def test_malformed_date_raises(self):
-        with self.assertRaises(ValueError):
-            VaihingenSource().parse_text(
-                make_text("  Wochenkarte vom 32.13 – 45.67.2026"))
+def test_week_dates(week):
+    assert "2026-08-03" == week.from_date
+    assert "2026-08-07" == week.to_date
 
 
-class StructureErrorTest(unittest.TestCase):
-    def test_no_weekday_blocks_raise(self):
-        text = "  Wochenkarte vom 03.08 – 07.08.2026\n   only dishes here\n"
-        with self.assertRaisesRegex(ValueError, "no weekday blocks"):
-            VaihingenSource().parse_text(text)
-
-    def test_fewer_than_three_dishes_raise(self):
-        with self.assertRaisesRegex(ValueError, "expected 3 dishes"):
-            VaihingenSource().parse_text(make_text(dishes_per_day=2))
-
-    def test_more_than_three_dishes_raise(self):
-        with self.assertRaisesRegex(ValueError, "expected 3 dishes"):
-            VaihingenSource().parse_text(make_text(dishes_per_day=4))
-
-    def test_empty_text_raises(self):
-        with self.assertRaises(ValueError):
-            VaihingenSource().parse_text("")
+def test_five_days_monday_to_friday(week):
+    assert 5 == len(week.days)
+    assert ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"] == [
+        day.weekday for day in week.days
+    ]
 
 
-class ParseWrapperTest(unittest.TestCase):
-    def test_parse_runs_pdftotext_and_returns_list_of_weeks(self):
-        source = VaihingenSource()
-        pdf_path = Path("/tmp/fake-vaihingen.pdf")
-        with mock.patch("mahlzeit.sources.vaihingen.run_pdftotext",
-                        return_value=FIXTURE.read_text(encoding="utf-8")) as run:
-            weeks = source.parse([pdf_path])
-        run.assert_called_once_with(pdf_path)
-        self.assertEqual(1, len(weeks))
-        self.assertEqual("2026-08-03", weeks[0].from_date)
-        self.assertEqual(5, len(weeks[0].days))
+def test_day_dates_match_week(week):
+    assert ["2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06",
+            "2026-08-07"] == [day.date for day in week.days]
 
 
-class FetchTest(unittest.TestCase):
-    def setUp(self):
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self.cache_dir = Path(self._tmpdir.name)
-        self.addCleanup(self._tmpdir.cleanup)
-
-    def test_fetch_downloads_pdf_into_source_subdir(self):
-        with mock.patch.object(
-            urllib.request, "urlopen", return_value=_FakeResponse(PDF_BYTES)
-        ) as urlopen:
-            paths = VaihingenSource().fetch(self.cache_dir)
-
-        request = urlopen.call_args.args[0]
-        self.assertEqual(SOURCE_URL, request.full_url)
-        self.assertIsNotNone(request.get_header("User-agent"))
-
-        self.assertEqual([self.cache_dir / "vaihingen" / "Wochenkarte.pdf"], paths)
-        self.assertEqual(PDF_BYTES, paths[0].read_bytes())
-
-    def test_fetch_overwrites_existing_copy(self):
-        dest = self.cache_dir / "vaihingen" / "Wochenkarte.pdf"
-        dest.parent.mkdir(parents=True)
-        dest.write_bytes(b"%PDF-1.4 stale copy")
-        with mock.patch.object(
-            urllib.request, "urlopen", return_value=_FakeResponse(PDF_BYTES)
-        ):
-            VaihingenSource().fetch(self.cache_dir)
-        self.assertEqual(PDF_BYTES, dest.read_bytes())
-
-    def test_fetch_rejects_non_pdf_response(self):
-        with mock.patch.object(
-            urllib.request, "urlopen", return_value=_FakeResponse(b"<html>not a pdf")
-        ):
-            with self.assertRaisesRegex(RuntimeError, "did not return a PDF"):
-                VaihingenSource().fetch(self.cache_dir)
-        self.assertFalse(
-            (self.cache_dir / "vaihingen" / "Wochenkarte.pdf").exists())
+def test_three_meals_per_day(week):
+    for day in week.days:
+        assert 3 == len(day.meals), day.weekday
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_names_and_vegan_flags(week):
+    for date, weekday, meals in EXPECTED:
+        day = next(d for d in week.days if d.date == date)
+        assert weekday == day.weekday
+        assert meals == [(meal.name, meal.vegan) for meal in day.meals]
+
+
+def test_vegan_marker_is_stripped_from_name(week):
+    for day in week.days:
+        for meal in day.meals:
+            assert not re.search(r"\([vV]\)\s*$", meal.name), meal.name
+
+
+def test_non_vegan_parenthetical_is_kept(week):
+    chowder = week.days[1].meals[2]
+    assert not chowder.vegan
+    assert "Seafood Chowder (Fisch Eintopf)" == chowder.name
+
+
+def test_names_are_whitespace_collapsed(week):
+    for day in week.days:
+        for meal in day.meals:
+            assert meal.name == " ".join(meal.name.split())
+
+
+def test_meals_are_standard_without_prices_allergens(week):
+    for day in week.days:
+        for meal in day.meals:
+            assert "Standard" == meal.type
+            assert meal.price_internal is None
+            assert meal.price_external is None
+            assert meal.allergens is None
+            assert not meal.sonderessen
+            assert "price_internal" not in meal.to_dict()
+            assert "allergens" not in meal.to_dict()
+
+
+def test_week_validates(week):
+    week.validate()
+
+
+def test_from_date_without_year_inherits_to_year():
+    week = VaihingenSource().parse_text(make_text())
+    assert "2026-08-03" == week.from_date
+    assert "2026-08-07" == week.to_date
+
+
+def test_both_dates_with_years_cross_year_boundary():
+    text = make_text("  Wochenkarte vom 29.12.2025 – 02.01.2026")
+    week = VaihingenSource().parse_text(text)
+    assert "2025-12-29" == week.from_date
+    assert "2026-01-02" == week.to_date
+
+
+def test_missing_date_range_raises():
+    text = "  Montag\n   A\n   B\n   C\n"
+    with pytest.raises(ValueError, match="Wochenkarte"):
+        VaihingenSource().parse_text(text)
+
+
+def test_malformed_date_raises():
+    with pytest.raises(ValueError):
+        VaihingenSource().parse_text(
+            make_text("  Wochenkarte vom 32.13 – 45.67.2026"))
+
+
+def test_no_weekday_blocks_raise():
+    text = "  Wochenkarte vom 03.08 – 07.08.2026\n   only dishes here\n"
+    with pytest.raises(ValueError, match="no weekday blocks"):
+        VaihingenSource().parse_text(text)
+
+
+def test_fewer_than_three_dishes_raise():
+    with pytest.raises(ValueError, match="expected 3 dishes"):
+        VaihingenSource().parse_text(make_text(dishes_per_day=2))
+
+
+def test_more_than_three_dishes_raise():
+    with pytest.raises(ValueError, match="expected 3 dishes"):
+        VaihingenSource().parse_text(make_text(dishes_per_day=4))
+
+
+def test_empty_text_raises():
+    with pytest.raises(ValueError):
+        VaihingenSource().parse_text("")
+
+
+def test_parse_runs_pdftotext_and_returns_list_of_weeks():
+    source = VaihingenSource()
+    pdf_path = Path("/tmp/fake-vaihingen.pdf")
+    with mock.patch("mahlzeit.sources.vaihingen.run_pdftotext",
+                    return_value=FIXTURE.read_text(encoding="utf-8")) as run:
+        weeks = source.parse([pdf_path])
+    run.assert_called_once_with(pdf_path)
+    assert 1 == len(weeks)
+    assert "2026-08-03" == weeks[0].from_date
+    assert 5 == len(weeks[0].days)
+
+
+def test_fetch_downloads_pdf_into_source_subdir(tmp_path):
+    with mock.patch.object(
+        urllib.request, "urlopen", return_value=_FakeResponse(PDF_BYTES)
+    ) as urlopen:
+        paths = VaihingenSource().fetch(tmp_path)
+
+    request = urlopen.call_args.args[0]
+    assert SOURCE_URL == request.full_url
+    assert request.get_header("User-agent") is not None
+
+    assert [tmp_path / "vaihingen" / "Wochenkarte.pdf"] == paths
+    assert PDF_BYTES == paths[0].read_bytes()
+
+
+def test_fetch_overwrites_existing_copy(tmp_path):
+    dest = tmp_path / "vaihingen" / "Wochenkarte.pdf"
+    dest.parent.mkdir(parents=True)
+    dest.write_bytes(b"%PDF-1.4 stale copy")
+    with mock.patch.object(
+        urllib.request, "urlopen", return_value=_FakeResponse(PDF_BYTES)
+    ):
+        VaihingenSource().fetch(tmp_path)
+    assert PDF_BYTES == dest.read_bytes()
+
+
+def test_fetch_rejects_non_pdf_response(tmp_path):
+    with mock.patch.object(
+        urllib.request, "urlopen", return_value=_FakeResponse(b"<html>not a pdf")
+    ):
+        with pytest.raises(RuntimeError, match="did not return a PDF"):
+            VaihingenSource().fetch(tmp_path)
+    assert not (tmp_path / "vaihingen" / "Wochenkarte.pdf").exists()
