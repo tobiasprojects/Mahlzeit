@@ -290,9 +290,12 @@ a {
   margin: 0 auto;
   padding: 1.75rem 1.5rem 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+}
+
+.week-nav {
+  flex-wrap: wrap;
 }
 
 .week-nav button,
@@ -327,6 +330,7 @@ a {
 }
 
 .day-nav .day-arrow {
+  flex: none;
   font-size: 1.1rem;
   line-height: 1;
   padding: 0.45rem 0.75rem;
@@ -337,9 +341,17 @@ a {
   cursor: default;
 }
 
-.day-label {
+.day-center {
   flex: 1;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0 0.5rem;
+}
+
+.day-label {
   font-weight: 600;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.15rem;
@@ -554,6 +566,71 @@ a {
   text-align: right;
   font-size: 0.9rem;
   white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ */
+/* Daily view: dish tiles                                              */
+/* ------------------------------------------------------------------ */
+
+.meal-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.meal-tile {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.meal-tile.green {
+  --tile-dot: var(--green-strong);
+}
+
+.meal-tile.orange {
+  --tile-dot: var(--orange-strong);
+}
+
+.tile-restaurant {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  margin-bottom: 0.15rem;
+}
+
+.tile-restaurant::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--tile-dot, var(--primary));
+}
+
+.tile-restaurant:hover {
+  text-decoration: underline;
+}
+
+.meal-tile .meal-name {
+  font-weight: 500;
+}
+
+.meal-tile .meal-price {
+  display: block;
+  margin-top: 0.35rem;
+  text-align: left;
 }
 
 .meal-none {

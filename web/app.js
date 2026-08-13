@@ -279,6 +279,34 @@ function renderMeal(meal) {
   return li;
 }
 
+function renderMealTile(meal, restaurant, accent) {
+  const article = document.createElement("article");
+  article.className = `meal-tile ${accent}`;
+
+  const label = document.createElement("a");
+  label.className = "tile-restaurant";
+  label.href = restaurant.source_url || "#";
+  label.target = "_blank";
+  label.rel = "noopener";
+  label.textContent = restaurant.name || restaurant.id;
+  article.append(label);
+
+  const name = document.createElement("span");
+  name.className = "meal-name";
+  name.textContent = meal.name || "–";
+  article.append(name, buildBadges(meal));
+
+  const price = priceText(meal);
+  if (price) {
+    const priceEl = document.createElement("span");
+    priceEl.className = "meal-price";
+    priceEl.textContent = price;
+    article.append(priceEl);
+  }
+
+  return article;
+}
+
 function renderDay(day) {
   const div = document.createElement("div");
   div.className = "day";
@@ -419,19 +447,20 @@ function renderDaily() {
   dayNavEl.textContent = "";
   dayNavEl.append(renderDailyNav());
 
-  const cards = document.createElement("div");
-  cards.className = "cards";
+  const tilesEl = document.createElement("div");
+  tilesEl.className = "meal-tiles";
   for (const [index, restaurant] of menu.restaurants.entries()) {
     const day = dayOf(restaurant, state.dayDate);
-    const days = day ? [day] : [];
-    cards.append(
-      renderCard(restaurant, days, accentOf(index), {
-        expired: false,
-        emptyText: "Keine Gerichte für diesen Tag.",
-      })
-    );
+    if (!day) continue;
+    const filtered = (day.meals || []).filter(mealMatchesFilter);
+    for (const meal of filtered) {
+      tilesEl.append(renderMealTile(meal, restaurant, accentOf(index)));
+    }
   }
-  dailyViewEl.append(cards);
+  if (!tilesEl.children.length) {
+    tilesEl.append(emptyLine("Keine Gerichte für diesen Tag."));
+  }
+  dailyViewEl.append(tilesEl);
 }
 
 function renderDayLabel() {
@@ -447,8 +476,7 @@ function renderDayLabel() {
 }
 
 function renderDailyNav() {
-  const nav = document.createElement("nav");
-  nav.setAttribute("aria-label", "Tag auswählen");
+  const frag = document.createDocumentFragment();
 
   const dates = allDayDates(state.menu);
   const index = dates.indexOf(state.dayDate);
@@ -478,6 +506,10 @@ function renderDailyNav() {
   label.className = "day-label";
   label.textContent = renderDayLabel();
 
+  const center = document.createElement("div");
+  center.className = "day-center";
+  center.append(today, label);
+
   const next = document.createElement("button");
   next.type = "button";
   next.className = "day-arrow";
@@ -489,8 +521,8 @@ function renderDailyNav() {
     renderDaily();
   });
 
-  nav.append(prev, today, label, next);
-  return nav;
+  frag.append(prev, center, next);
+  return frag;
 }
 
 function renderViewTabs() {
