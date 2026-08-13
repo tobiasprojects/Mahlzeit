@@ -340,7 +340,6 @@ function accentOf(index) {
 }
 
 const ICONS = ["🌿", "🍴"];
-const KICKERS = ["Kantine A", "Kantine B"];
 
 function renderCard(restaurant, days, accent, opts = {}) {
   const section = document.createElement("section");
@@ -357,9 +356,6 @@ function renderCard(restaurant, days, accent, opts = {}) {
 
   const title = document.createElement("div");
   title.className = "card-title";
-  const kicker = document.createElement("span");
-  kicker.className = "card-kicker";
-  kicker.textContent = KICKERS[accent === "green" ? 0 : 1];
   const name = document.createElement("h2");
   name.className = "card-name";
   const link = document.createElement("a");
@@ -368,7 +364,7 @@ function renderCard(restaurant, days, accent, opts = {}) {
   link.rel = "noopener";
   link.textContent = restaurant.name || restaurant.id;
   name.append(link);
-  title.append(kicker, name);
+  title.append(name);
 
   head.append(icon, title);
 
@@ -390,19 +386,6 @@ function renderCard(restaurant, days, accent, opts = {}) {
     for (const day of days) daysEl.append(renderDay(day));
   }
   section.append(daysEl);
-
-  section.append(Object.assign(document.createElement("hr"), { className: "card-divider" }));
-
-  const foot = document.createElement("div");
-  foot.className = "card-foot";
-  const button = document.createElement("a");
-  button.className = "btn";
-  button.href = restaurant.source_url || "#";
-  button.target = "_blank";
-  button.rel = "noopener";
-  button.textContent = "Details ansehen →";
-  foot.append(button);
-  section.append(foot);
 
   return section;
 }
