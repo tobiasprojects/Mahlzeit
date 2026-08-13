@@ -239,13 +239,6 @@ function renderMeal(meal) {
     li.append(priceEl);
   }
 
-  if (meal.allergens) {
-    const allergensEl = document.createElement("span");
-    allergensEl.className = "meal-allergens";
-    allergensEl.textContent = `Allergene: ${meal.allergens}`;
-    li.append(allergensEl);
-  }
-
   return li;
 }
 
