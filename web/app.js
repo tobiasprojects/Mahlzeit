@@ -4,13 +4,17 @@ const STALE_MS = 4 * 24 * 60 * 60 * 1000;
 
 const state = {
   menu: null,
+  view: "daily",
   weekKey: null,
+  dayDate: null,
   veggie: false,
 };
 
 const freshnessEl = document.getElementById("freshness");
 const staleEl = document.getElementById("stale-warning");
+const viewTabsEl = document.getElementById("view-tabs");
 const weekNavEl = document.getElementById("week-nav");
+const dailyViewEl = document.getElementById("daily-view");
 const columnsEl = document.getElementById("columns");
 const veggieFilterEl = document.getElementById("veggie-filter");
 
@@ -125,6 +129,34 @@ function defaultWeekKey(menu) {
   return keys[keys.length - 1];
 }
 
+function allDayDates(menu) {
+  const dates = new Set();
+  for (const restaurant of menu.restaurants) {
+    for (const week of restaurant.weeks || []) {
+      for (const day of week.days) dates.add(day.date);
+    }
+  }
+  return [...dates].sort();
+}
+
+function defaultDayDate(menu) {
+  const dates = allDayDates(menu);
+  if (!dates.length) return null;
+  const today = todayISO();
+  if (dates.includes(today)) return today;
+  const upcoming = dates.find((date) => date > today);
+  if (upcoming) return upcoming;
+  return dates[dates.length - 1];
+}
+
+function dayOf(restaurant, date) {
+  for (const week of restaurant.weeks || []) {
+    const day = (week.days || []).find((d) => d.date === date);
+    if (day) return day;
+  }
+  return null;
+}
+
 function mealMatchesFilter(meal) {
   if (!state.veggie) return true;
   return meal.vegan === true || meal.type === "Menü 2";
@@ -206,14 +238,13 @@ function renderWeekNav() {
   }
 }
 
-function renderMeal(meal) {
-  const li = document.createElement("li");
-  li.className = "meal";
+function buildMealContent(meal) {
+  const frag = document.createDocumentFragment();
 
   const name = document.createElement("span");
   name.className = "meal-name";
   name.textContent = meal.name || "–";
-  li.append(name);
+  frag.append(name);
 
   const badges = [];
   if (meal.vegan === true) badges.push({ text: "vegan", cls: "vegan" });
@@ -228,7 +259,7 @@ function renderMeal(meal) {
       span.textContent = badge.text;
       tagsEl.append(span);
     }
-    li.append(tagsEl);
+    frag.append(tagsEl);
   }
 
   const price = priceText(meal);
@@ -236,10 +267,32 @@ function renderMeal(meal) {
     const priceEl = document.createElement("span");
     priceEl.className = "meal-price";
     priceEl.textContent = price;
-    li.append(priceEl);
+    frag.append(priceEl);
   }
 
+  return frag;
+}
+
+function renderMeal(meal) {
+  const li = document.createElement("li");
+  li.className = "meal";
+  li.append(buildMealContent(meal));
   return li;
+}
+
+function renderMealTile(meal, restaurant) {
+  const article = document.createElement("article");
+  article.className = "meal-tile";
+  const label = document.createElement("span");
+  label.className = "meal-restaurant";
+  const link = document.createElement("a");
+  link.href = restaurant.source_url || "#";
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = restaurant.name || restaurant.id;
+  label.append(link);
+  article.append(label, buildMealContent(meal));
+  return article;
 }
 
 function renderDay(day) {
@@ -336,10 +389,110 @@ function renderColumns() {
   }
 }
 
+function renderDaily() {
+  dailyViewEl.textContent = "";
+  const menu = state.menu;
+  if (!menu || !menu.restaurants || !menu.restaurants.length) {
+    dailyViewEl.append(emptyLine("Keine Restaurants in den Daten."));
+    return;
+  }
+  if (!state.dayDate) state.dayDate = defaultDayDate(menu);
+  dailyViewEl.append(renderDailyNav());
+
+  const tilesEl = document.createElement("div");
+  tilesEl.className = "meal-tiles";
+  for (const restaurant of menu.restaurants) {
+    const day = dayOf(restaurant, state.dayDate);
+    if (!day) continue;
+    const filtered = (day.meals || []).filter(mealMatchesFilter);
+    for (const meal of filtered) tilesEl.append(renderMealTile(meal, restaurant));
+  }
+  if (!tilesEl.children.length) {
+    tilesEl.append(emptyLine("Keine Gerichte für diesen Tag."));
+  }
+  dailyViewEl.append(tilesEl);
+}
+
+function renderDayLabel() {
+  let weekday = "";
+  for (const restaurant of state.menu.restaurants) {
+    const day = dayOf(restaurant, state.dayDate);
+    if (day && day.weekday) {
+      weekday = day.weekday;
+      break;
+    }
+  }
+  return [weekday, formatGerman(state.dayDate)].filter(Boolean).join(", ");
+}
+
+function renderDailyNav() {
+  const nav = document.createElement("nav");
+  nav.className = "day-nav";
+  nav.setAttribute("aria-label", "Tag auswählen");
+
+  const dates = allDayDates(state.menu);
+  const index = dates.indexOf(state.dayDate);
+
+  const prev = document.createElement("button");
+  prev.type = "button";
+  prev.className = "day-arrow";
+  prev.setAttribute("aria-label", "Vorheriger Tag");
+  prev.textContent = "←";
+  prev.disabled = index <= 0;
+  prev.addEventListener("click", () => {
+    state.dayDate = dates[index - 1];
+    renderDaily();
+  });
+
+  const today = document.createElement("button");
+  today.type = "button";
+  today.className = "today-btn";
+  today.textContent = "Heute";
+  today.disabled = state.dayDate === todayISO();
+  today.addEventListener("click", () => {
+    state.dayDate = defaultDayDate(state.menu);
+    renderDaily();
+  });
+
+  const label = document.createElement("span");
+  label.className = "day-label";
+  label.textContent = renderDayLabel();
+
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "day-arrow";
+  next.setAttribute("aria-label", "Nächster Tag");
+  next.textContent = "→";
+  next.disabled = index < 0 || index >= dates.length - 1;
+  next.addEventListener("click", () => {
+    state.dayDate = dates[index + 1];
+    renderDaily();
+  });
+
+  nav.append(prev, today, label, next);
+  return nav;
+}
+
+function renderViewTabs() {
+  for (const btn of viewTabsEl.querySelectorAll("button[data-view]")) {
+    const active = btn.dataset.view === state.view;
+    btn.setAttribute("aria-pressed", String(active));
+  }
+  weekNavEl.classList.toggle("hidden", state.view !== "weekly");
+  dailyViewEl.classList.toggle("hidden", state.view !== "daily");
+  columnsEl.classList.toggle("hidden", state.view !== "weekly");
+}
+
+function renderView() {
+  if (state.view === "daily") renderDaily();
+  else renderColumns();
+}
+
 function render() {
   renderFreshness();
+  renderViewTabs();
   renderWeekNav();
-  renderColumns();
+  renderView();
 }
 
 async function load() {
@@ -349,21 +502,31 @@ async function load() {
     const menu = await response.json();
     state.menu = menu;
     state.weekKey = defaultWeekKey(menu);
+    state.dayDate = defaultDayDate(menu);
     render();
   } catch (err) {
+    dailyViewEl.textContent = "";
     columnsEl.textContent = "";
     const box = document.createElement("p");
     box.className = "error-state";
     box.textContent =
       `Konnte data/menus.json nicht laden (${err.message}). ` +
       "Bitte zuerst `mahlzeit refresh` ausführen und den Server starten.";
+    dailyViewEl.append(box);
     columnsEl.append(box);
   }
 }
 
+viewTabsEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("button[data-view]");
+  if (!btn || btn.dataset.view === state.view) return;
+  state.view = btn.dataset.view;
+  render();
+});
+
 veggieFilterEl.addEventListener("change", () => {
   state.veggie = veggieFilterEl.checked;
-  renderColumns();
+  renderView();
 });
 
 load();

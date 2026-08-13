@@ -105,6 +105,13 @@ body {
   display: none;
 }
 
+.columns.hidden,
+.week-nav.hidden,
+.daily-view.hidden,
+.stale.hidden {
+  display: none;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -176,6 +183,116 @@ body {
 
 .week-nav button.today-btn {
   border-style: dashed;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.view-tabs button {
+  font: inherit;
+  padding: 0.35rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.view-tabs button:hover {
+  border-color: var(--accent);
+}
+
+.view-tabs button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.daily-view {
+  padding: 1.25rem 1.5rem 0.25rem;
+}
+
+.day-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.day-nav button {
+  font: inherit;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.day-nav button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.day-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.day-nav button.today-btn {
+  border-style: dashed;
+}
+
+.day-nav .day-arrow {
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.35rem 0.65rem;
+}
+
+.day-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+
+.meal-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+  gap: 0.6rem;
+}
+
+.meal-tile {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+}
+
+.meal-restaurant {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.meal-restaurant a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.meal-restaurant a:hover {
+  text-decoration: underline;
+}
+
+.meal-tile .meal-tags {
+  margin-left: 0;
+}
+
+.meal-tile .meal-name {
+  font-weight: 500;
 }
 
 .columns {
@@ -359,7 +476,8 @@ body {
     padding: 1rem 1rem 0.8rem;
   }
 
-  .columns {
+  .columns,
+  .daily-view {
     padding: 1rem;
   }
 }

@@ -24,6 +24,15 @@ def test_footer_links_legal_pages_from_index():
         assert f'href="{page}"' in index
 
 
+def test_index_has_daily_and_weekly_view_tabs():
+    index = _read_web("index.html")
+    assert 'data-view="daily"' in index
+    assert 'data-view="weekly"' in index
+    assert 'id="daily-view"' in index
+    assert 'id="week-nav"' in index
+    assert 'id="columns"' in index
+
+
 def test_datenschutz_links_back_and_to_impressum():
     datenschutz = _read_web("datenschutz.html")
     assert 'href="index.html"' in datenschutz

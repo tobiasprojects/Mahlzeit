@@ -34,9 +34,16 @@
         <button type="button" id="theme-toggle" class="theme-toggle"
           aria-pressed="false">Dunkelmodus</button>
       </div>
-      <nav class="week-nav" id="week-nav" aria-label="Wochen"></nav>
+      <nav class="view-tabs" id="view-tabs" aria-label="Ansicht">
+        <button type="button" data-view="daily" aria-pressed="true">Täglich</button>
+        <button type="button" data-view="weekly" aria-pressed="false">Wöchentlich</button>
+      </nav>
+      <nav class="week-nav hidden" id="week-nav" aria-label="Wochen"></nav>
     </header>
-    <main class="columns" id="columns"></main>
+    <main>
+      <section class="daily-view" id="daily-view"></section>
+      <section class="columns hidden" id="columns"></section>
+    </main>
     <footer class="site-footer">
       <p>Mahlzeit — lokales Projekt. Inhalte stammen aus den Wochenkarten der Restaurants
         (faktenbasierte Übernahme); Links führen zum jeweiligen Original.</p>
