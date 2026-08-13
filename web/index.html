@@ -23,34 +23,52 @@
   </head>
   <body>
     <header class="site-header">
-      <h1>Mahlzeit</h1>
-      <p class="freshness" id="freshness"></p>
-      <div class="stale hidden" id="stale-warning" role="alert"></div>
-      <div class="controls">
-        <label class="filter">
-          <input type="checkbox" id="veggie-filter">
-          <span>Nur vegetarisch / vegan</span>
-        </label>
-        <button type="button" id="theme-toggle" class="theme-toggle"
-          aria-pressed="false">Dunkelmodus</button>
+      <div class="nav-inner">
+        <a class="logo" href="index.html">🌿 Mahlzeit</a>
+        <nav class="nav-links" id="view-tabs" aria-label="Ansicht">
+          <button type="button" data-view="daily" aria-pressed="true">Täglich</button>
+          <button type="button" data-view="weekly" aria-pressed="false">Wöchentlich</button>
+          <a href="about.html">Über Mahlzeit</a>
+        </nav>
+        <div class="nav-controls">
+          <label class="filter">
+            <input type="checkbox" id="veggie-filter">
+            <span>vegan</span>
+          </label>
+          <button type="button" id="theme-toggle" class="theme-toggle"
+            aria-pressed="false">Dunkelmodus</button>
+        </div>
       </div>
-      <nav class="view-tabs" id="view-tabs" aria-label="Ansicht">
-        <button type="button" data-view="daily" aria-pressed="true">Täglich</button>
-        <button type="button" data-view="weekly" aria-pressed="false">Wöchentlich</button>
-      </nav>
-      <nav class="week-nav hidden" id="week-nav" aria-label="Wochen"></nav>
     </header>
+
+    <section class="hero">
+      <div class="hero-inner">
+        <h1>Zwei Kantinen.<br>Ein Ort.</h1>
+        <p>Entdecke die Menüs von Rolands Maultaschen und Naherholungsgebiet.</p>
+      </div>
+    </section>
+
+    <p class="freshness" id="freshness"></p>
+    <div class="stale hidden" id="stale-warning" role="alert"></div>
+
+    <nav class="week-nav hidden" id="week-nav" aria-label="Wochen"></nav>
+    <nav class="day-nav hidden" id="day-nav" aria-label="Tag"></nav>
+
     <main>
-      <section class="daily-view" id="daily-view"></section>
-      <section class="columns hidden" id="columns"></section>
+      <section class="section daily-view" id="daily-view"></section>
+      <section class="section columns hidden" id="columns"></section>
     </main>
+
     <footer class="site-footer">
-      <p>Mahlzeit — lokales Projekt. Inhalte stammen aus den Wochenkarten der Restaurants
-        (faktenbasierte Übernahme); Links führen zum jeweiligen Original.</p>
-      <nav class="footer-links" aria-label="Rechtliches">
-        <a href="impressum.html">Impressum</a>
-        <a href="datenschutz.html">Datenschutz</a>
-      </nav>
+      <div class="footer-inner">
+        <a class="logo" href="index.html">🌿 Mahlzeit</a>
+        <p class="footer-tagline">Zwei Kantinen. Ein Ort.</p>
+        <nav class="footer-links" aria-label="Rechtliches">
+          <a href="about.html">Über Mahlzeit</a>
+          <a href="impressum.html">Impressum</a>
+          <a href="datenschutz.html">Datenschutz</a>
+        </nav>
+      </div>
     </footer>
     <script src="app.js"></script>
   </body>

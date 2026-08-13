@@ -33,6 +33,12 @@ def test_index_has_daily_and_weekly_view_tabs():
     assert 'id="columns"' in index
 
 
+def test_index_links_about_page():
+    index = _read_web("index.html")
+    assert 'href="about.html"' in index
+    assert (WEB_DIR / "about.html").exists()
+
+
 def test_datenschutz_links_back_and_to_impressum():
     datenschutz = _read_web("datenschutz.html")
     assert 'href="index.html"' in datenschutz

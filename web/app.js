@@ -14,6 +14,7 @@ const freshnessEl = document.getElementById("freshness");
 const staleEl = document.getElementById("stale-warning");
 const viewTabsEl = document.getElementById("view-tabs");
 const weekNavEl = document.getElementById("week-nav");
+const dayNavEl = document.getElementById("day-nav");
 const dailyViewEl = document.getElementById("daily-view");
 const columnsEl = document.getElementById("columns");
 const veggieFilterEl = document.getElementById("veggie-filter");
@@ -238,61 +239,44 @@ function renderWeekNav() {
   }
 }
 
-function buildMealContent(meal) {
-  const frag = document.createDocumentFragment();
-
-  const name = document.createElement("span");
-  name.className = "meal-name";
-  name.textContent = meal.name || "–";
-  frag.append(name);
-
+function buildBadges(meal) {
   const badges = [];
   if (meal.vegan === true) badges.push({ text: "vegan", cls: "vegan" });
   else if (meal.type === "Menü 2") badges.push({ text: "vegetarisch", cls: "vegan" });
   if (meal.sonderessen) badges.push({ text: "Sonderessen", cls: "sonderessen" });
-  if (badges.length) {
-    const tagsEl = document.createElement("span");
-    tagsEl.className = "meal-tags";
-    for (const badge of badges) {
-      const span = document.createElement("span");
-      span.className = `badge ${badge.cls}`;
-      span.textContent = badge.text;
-      tagsEl.append(span);
-    }
-    frag.append(tagsEl);
+
+  const tagsEl = document.createElement("span");
+  tagsEl.className = "meal-tags";
+  for (const badge of badges) {
+    const span = document.createElement("span");
+    span.className = `badge ${badge.cls}`;
+    span.textContent = badge.text;
+    tagsEl.append(span);
   }
+  return tagsEl;
+}
+
+function renderMeal(meal) {
+  const li = document.createElement("li");
+  li.className = "meal";
+
+  const text = document.createElement("span");
+  text.className = "meal-text";
+  const name = document.createElement("span");
+  name.className = "meal-name";
+  name.textContent = meal.name || "–";
+  text.append(name, buildBadges(meal));
+  li.append(text);
 
   const price = priceText(meal);
   if (price) {
     const priceEl = document.createElement("span");
     priceEl.className = "meal-price";
     priceEl.textContent = price;
-    frag.append(priceEl);
+    li.append(priceEl);
   }
 
-  return frag;
-}
-
-function renderMeal(meal) {
-  const li = document.createElement("li");
-  li.className = "meal";
-  li.append(buildMealContent(meal));
   return li;
-}
-
-function renderMealTile(meal, restaurant) {
-  const article = document.createElement("article");
-  article.className = "meal-tile";
-  const label = document.createElement("span");
-  label.className = "meal-restaurant";
-  const link = document.createElement("a");
-  link.href = restaurant.source_url || "#";
-  link.target = "_blank";
-  link.rel = "noopener";
-  link.textContent = restaurant.name || restaurant.id;
-  label.append(link);
-  article.append(label, buildMealContent(meal));
-  return article;
 }
 
 function renderDay(day) {
@@ -315,7 +299,7 @@ function renderDay(day) {
   mealsEl.className = "meals";
   const filtered = (day.meals || []).filter(mealMatchesFilter);
   if (!filtered.length) {
-    mealsEl.append(emptyLine("–"));
+    mealsEl.append(emptyLine("Keine Gerichte für diesen Tag."));
   } else {
     for (const meal of filtered) mealsEl.append(renderMeal(meal));
   }
@@ -323,57 +307,75 @@ function renderDay(day) {
   return div;
 }
 
-function renderRestaurant(restaurant) {
-  const section = document.createElement("section");
-  section.className = "restaurant";
+function accentOf(index) {
+  return index % 2 === 0 ? "green" : "orange";
+}
 
-  const heading = document.createElement("h2");
-  heading.className = "restaurant-name";
+const ICONS = ["🌿", "🍴"];
+const KICKERS = ["Kantine A", "Kantine B"];
+
+function renderCard(restaurant, days, accent, opts = {}) {
+  const section = document.createElement("section");
+  section.className = `canteen-card ${accent}`;
+  if (opts.expired) section.classList.add("expired");
+
+  const head = document.createElement("div");
+  head.className = "card-head";
+
+  const icon = document.createElement("div");
+  icon.className = `card-icon ${accent}`;
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = ICONS[accent === "green" ? 0 : 1];
+
+  const title = document.createElement("div");
+  title.className = "card-title";
+  const kicker = document.createElement("span");
+  kicker.className = "card-kicker";
+  kicker.textContent = KICKERS[accent === "green" ? 0 : 1];
+  const name = document.createElement("h2");
+  name.className = "card-name";
   const link = document.createElement("a");
   link.href = restaurant.source_url || "#";
   link.target = "_blank";
   link.rel = "noopener";
   link.textContent = restaurant.name || restaurant.id;
-  heading.append(link, " ↗");
-  section.append(heading);
+  name.append(link);
+  title.append(kicker, name);
 
-  const meta = document.createElement("p");
-  meta.className = "restaurant-meta";
+  head.append(icon, title);
 
-  const week = weekOf(restaurant, state.weekKey);
-  if (week) {
-    const range = document.createElement("span");
-    range.className = "week-range";
-    range.textContent = shortWeekLabel(week.from, week.to);
-    meta.append(range);
-    if (isExpired(week.to)) {
-      section.classList.add("expired");
-      const note = document.createElement("span");
-      note.className = "expired-note";
-      note.textContent = "abgelaufen";
-      meta.append(note);
-    }
-  } else {
-    const note = document.createElement("span");
-    note.className = "expired-note";
-    note.textContent = "keine Daten für diese Woche";
-    meta.append(note);
+  if (opts.expired) {
+    const status = document.createElement("span");
+    status.className = "card-status expired";
+    status.textContent = "Abgelaufen";
+    head.append(status);
   }
-  section.append(meta);
+  section.append(head);
+
+  section.append(Object.assign(document.createElement("hr"), { className: "card-divider" }));
 
   const daysEl = document.createElement("div");
-  daysEl.className = "days";
-  if (week) {
-    const days = [...week.days].sort((a, b) => (a.date < b.date ? -1 : 1));
-    if (!days.length) {
-      daysEl.append(emptyLine("Keine Gerichte für diese Woche."));
-    } else {
-      for (const day of days) daysEl.append(renderDay(day));
-    }
+  daysEl.className = "card-days";
+  if (!days.length) {
+    daysEl.append(emptyLine(opts.emptyText || "–"));
   } else {
-    daysEl.append(emptyLine("–"));
+    for (const day of days) daysEl.append(renderDay(day));
   }
   section.append(daysEl);
+
+  section.append(Object.assign(document.createElement("hr"), { className: "card-divider" }));
+
+  const foot = document.createElement("div");
+  foot.className = "card-foot";
+  const button = document.createElement("a");
+  button.className = "btn";
+  button.href = restaurant.source_url || "#";
+  button.target = "_blank";
+  button.rel = "noopener";
+  button.textContent = "Details ansehen →";
+  foot.append(button);
+  section.append(foot);
+
   return section;
 }
 
@@ -384,9 +386,25 @@ function renderColumns() {
     columnsEl.append(emptyLine("Keine Restaurants in den Daten."));
     return;
   }
-  for (const restaurant of menu.restaurants) {
-    columnsEl.append(renderRestaurant(restaurant));
+  const cards = document.createElement("div");
+  cards.className = "cards";
+  for (const [index, restaurant] of menu.restaurants.entries()) {
+    const week = weekOf(restaurant, state.weekKey);
+    if (!week) {
+      cards.append(
+        renderCard(restaurant, [], accentOf(index), {
+          expired: false,
+          emptyText: "Keine Daten für diese Woche.",
+        })
+      );
+      continue;
+    }
+    const days = [...week.days].sort((a, b) => (a.date < b.date ? -1 : 1));
+    cards.append(
+      renderCard(restaurant, days, accentOf(index), { expired: isExpired(week.to) })
+    );
   }
+  columnsEl.append(cards);
 }
 
 function renderDaily() {
@@ -397,20 +415,23 @@ function renderDaily() {
     return;
   }
   if (!state.dayDate) state.dayDate = defaultDayDate(menu);
-  dailyViewEl.append(renderDailyNav());
 
-  const tilesEl = document.createElement("div");
-  tilesEl.className = "meal-tiles";
-  for (const restaurant of menu.restaurants) {
+  dayNavEl.textContent = "";
+  dayNavEl.append(renderDailyNav());
+
+  const cards = document.createElement("div");
+  cards.className = "cards";
+  for (const [index, restaurant] of menu.restaurants.entries()) {
     const day = dayOf(restaurant, state.dayDate);
-    if (!day) continue;
-    const filtered = (day.meals || []).filter(mealMatchesFilter);
-    for (const meal of filtered) tilesEl.append(renderMealTile(meal, restaurant));
+    const days = day ? [day] : [];
+    cards.append(
+      renderCard(restaurant, days, accentOf(index), {
+        expired: false,
+        emptyText: "Keine Gerichte für diesen Tag.",
+      })
+    );
   }
-  if (!tilesEl.children.length) {
-    tilesEl.append(emptyLine("Keine Gerichte für diesen Tag."));
-  }
-  dailyViewEl.append(tilesEl);
+  dailyViewEl.append(cards);
 }
 
 function renderDayLabel() {
@@ -427,7 +448,6 @@ function renderDayLabel() {
 
 function renderDailyNav() {
   const nav = document.createElement("nav");
-  nav.className = "day-nav";
   nav.setAttribute("aria-label", "Tag auswählen");
 
   const dates = allDayDates(state.menu);
@@ -479,6 +499,7 @@ function renderViewTabs() {
     btn.setAttribute("aria-pressed", String(active));
   }
   weekNavEl.classList.toggle("hidden", state.view !== "weekly");
+  dayNavEl.classList.toggle("hidden", state.view !== "daily");
   dailyViewEl.classList.toggle("hidden", state.view !== "daily");
   columnsEl.classList.toggle("hidden", state.view !== "weekly");
 }
